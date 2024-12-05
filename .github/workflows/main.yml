@@ -1,0 +1,72 @@
+name: Microservices Build docker hub
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up JDK
+        uses: actions/setup-java@v2
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          
+      # Construccion de jars
+      - name: Build Micro Worker
+        run: mvn -f MicroserviceWorker/pom.xml clean install -DskipTests=true
+      
+      - name: Build Micro Product
+        run: mvn -f MicroserviceProduct/pom.xml clean install -DskipTests=true
+
+      - name: Build Micro ConfigPF
+        run: mvn -f MicroserviceConfigPF/pom.xml clean install -DskipTests=true
+
+      - name: Build Micro Eureka
+        run: mvn -f MicroserviceEureka/pom.xml clean install -DskipTests=true
+
+
+      # Construccion de imagenes
+      - name: Build image Worker
+        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/mes:worker .
+        working-directory: MicroserviceClient
+        
+      - name: Build image config
+        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/mes:config .
+        working-directory: MicroserviceConfig
+        
+      - name: Build image eureka
+        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/mes:eureka .
+        working-directory: MicroserviceEureka
+
+      - name: Build image Product
+        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/mes:product .
+        working-directory: MicroserviceProduct
+
+
+      #Login docker
+      - name: Log in to Docker Hub 
+        uses: docker/login-action@v3.3.0
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+
+        
+      #Envio de imagenes a docker hub
+      - name: Push Docker image to Docker Hub
+        run: |
+          docker push ${{ secrets.DOCKER_USERNAME }}/mes:worker
+          docker push ${{ secrets.DOCKER_USERNAME }}/mes:configPF
+          docker push ${{ secrets.DOCKER_USERNAME }}/mes:eureka
+          docker push ${{ secrets.DOCKER_USERNAME }}/mes:product
